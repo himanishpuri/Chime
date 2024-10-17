@@ -1,7 +1,6 @@
 import Message from "./Components/Message.jsx";
 import { useEffect, useState } from "react";
 import { Button } from "@headlessui/react";
-import { io } from "socket.io-client";
 import axios from "axios";
 import { useUser } from "../Utils/Context.jsx";
 import { useNavigate } from "react-router-dom";
@@ -10,12 +9,15 @@ import "react-toastify/dist/ReactToastify.css";
 
 const BACKEND_URI = import.meta.env.VITE_BACKEND_URI;
 
-const socket = io(`${BACKEND_URI}`);
-
 const ChatPage = () => {
-	const { username: currentUser } = useUser();
+	const {
+		username: currentUser,
+		socket,
+		disconnectSocket,
+		setUsername,
+	} = useUser();
 	const navigate = useNavigate();
-	if (!currentUser) navigate("/login");
+	if (!currentUser || !socket) navigate("/login");
 	const [messages, setMessages] = useState([]);
 	const [textMessage, setTextMessage] = useState("");
 	const [rooms, setRooms] = useState([]);
@@ -27,6 +29,11 @@ const ChatPage = () => {
 			console.log("Rooms", res.data);
 			setRooms(res.data.map((room) => room.roomID));
 		});
+
+		if (!socket) {
+			navigate("/login");
+			return;
+		}
 
 		socket.on("connect", () => {
 			console.log("Connected to server");
@@ -108,7 +115,7 @@ const ChatPage = () => {
 			socket.off("RoomInvalid");
 			socket.off("chatLog");
 		};
-	}, []);
+	}, [currentUser, socket]);
 
 	const handleSendMessage = async () => {
 		if (!textMessage.trim()) {
@@ -131,13 +138,12 @@ const ChatPage = () => {
 	};
 
 	const handleCreateRoom = () => {
-		if (!newRoomName.trim()) {
-			// setRooms((prev) => [...prev, newRoomName]);
-			// setCurrentRoom(newRoomName);
+		if (newRoomName.trim()) {
+			socket.emit("createRoom", newRoomName, currentUser);
+		} else {
 			toast.error("Room name cannot be empty");
 		}
 		setNewRoomName("");
-		socket.emit("createRoom", newRoomName, currentUser);
 	};
 
 	const handleJoinRoom = (roomID) => {
@@ -158,12 +164,18 @@ const ChatPage = () => {
 		socket.emit("leaveRoom", roomID, currentUser);
 	};
 
+	const handleLogout = () => {
+		disconnectSocket();
+		setUsername("");
+		navigate("/login");
+	};
+
 	return (
 		<div className="flex flex-col h-screen bg-gray-300 overflow-y-visible">
 			<header className="bg-blue-600 text-white p-4 flex justify-between items-center fixed top-0 left-0 right-0 z-10 shadow-lg">
 				<h1 className="text-2xl font-bold">Chat Application</h1>
 				<Button
-					onClick={() => console.log("Logged out")}
+					onClick={handleLogout}
 					className="bg-blue-800 text-white px-4 py-2 rounded ml-2 hover:bg-black focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-opacity-75 duration-300 transform hover:scale-105 active:scale-95"
 				>
 					Log Out

@@ -10,7 +10,7 @@ const BACKEND_URI = import.meta.env.VITE_BACKEND_URI;
 const Register = () => {
 	const { register, handleSubmit } = useForm();
 	const navigate = useNavigate();
-	const { setUsername } = useUser();
+	const { setUsername, connectSocket } = useUser();
 
 	const onSubmit = async (data) => {
 		console.log(data);
@@ -20,6 +20,7 @@ const Register = () => {
 			if (response.statusText === "Created") {
 				console.log("User registered successfully");
 				setUsername(data.username);
+				connectSocket();
 				navigate("/chat");
 			}
 		} catch (error) {
@@ -99,6 +100,13 @@ const Register = () => {
 							className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline"
 						>
 							Register
+						</button>
+						<button
+							onClick={() => navigate("/login")}
+							type="button"
+							className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline"
+						>
+							Have an Account?
 						</button>
 					</div>
 				</form>

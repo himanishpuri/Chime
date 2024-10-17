@@ -9,7 +9,7 @@ const BACKEND_URI = import.meta.env.VITE_BACKEND_URI;
 const Login = () => {
 	const { register, handleSubmit } = useForm();
 	const navigate = useNavigate();
-	const { setUsername } = useUser();
+	const { setUsername, connectSocket } = useUser();
 
 	const onSubmit = async (data) => {
 		console.log("Login data:", data);
@@ -19,6 +19,7 @@ const Login = () => {
 			if (response.statusText === "OK") {
 				console.log("User logged in successfully");
 				setUsername(data.username);
+				connectSocket();
 				navigate("/chat");
 			}
 		} catch (error) {

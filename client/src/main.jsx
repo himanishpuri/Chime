@@ -7,7 +7,7 @@ import Login from "./Pages/Login.jsx";
 import Register from "./Pages/Register.jsx";
 import ChatPage from "./Pages/ChatPage.jsx";
 
-import { UserProvider } from "./Utils/Context.jsx";
+import UserProvider from "./Utils/Context.jsx";
 
 const router = createBrowserRouter([
 	{
