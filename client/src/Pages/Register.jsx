@@ -1,25 +1,34 @@
 import { useForm } from "react-hook-form";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
+import { useUser } from "../Utils/Context.jsx";
+import { ToastContainer, toast } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 
 const BACKEND_URI = import.meta.env.VITE_BACKEND_URI;
 
 const Register = () => {
 	const { register, handleSubmit } = useForm();
 	const navigate = useNavigate();
+	const { setUsername } = useUser();
 
 	const onSubmit = async (data) => {
 		console.log(data);
 		console.log(BACKEND_URI);
 		try {
-			const response = axios.post(`${BACKEND_URI}/api/register`, data);
-			if (response.statusText === "OK") {
+			const response = await axios.post(`${BACKEND_URI}/api/register`, data);
+			if (response.statusText === "Created") {
 				console.log("User registered successfully");
+				setUsername(data.username);
 				navigate("/chat");
 			}
 		} catch (error) {
 			console.log("Error registering user");
-			console.error(error);
+			if (error.response.data.message === "UserAlreadyExists") {
+				navigate("/login");
+			} else {
+				toast.error("Error creating user");
+			}
 		}
 	};
 
@@ -40,6 +49,20 @@ const Register = () => {
 							id="username"
 							className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
 							{...register("username", { required: true })}
+						/>
+					</div>
+					<div className="mb-4">
+						<label
+							className="block text-gray-700 text-sm font-bold mb-2"
+							htmlFor="name"
+						>
+							Name
+						</label>
+						<input
+							type="text"
+							id="name"
+							className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+							{...register("name", { required: true })}
 						/>
 					</div>
 					<div className="mb-4">
@@ -80,6 +103,7 @@ const Register = () => {
 					</div>
 				</form>
 			</div>
+			<ToastContainer />
 		</div>
 	);
 };

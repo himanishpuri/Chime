@@ -1,24 +1,34 @@
 import { useForm } from "react-hook-form";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
+import { useUser } from "../Utils/Context.jsx";
+import { ToastContainer, toast } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 const BACKEND_URI = import.meta.env.VITE_BACKEND_URI;
 
 const Login = () => {
 	const { register, handleSubmit } = useForm();
 	const navigate = useNavigate();
+	const { setUsername } = useUser();
 
 	const onSubmit = async (data) => {
-		console.log(data);
+		console.log("Login data:", data);
 		console.log(BACKEND_URI);
 		try {
-			const response = axios.post(`${BACKEND_URI}/api/login`, data);
+			const response = await axios.post(`${BACKEND_URI}/api/login`, data);
 			if (response.statusText === "OK") {
 				console.log("User logged in successfully");
+				setUsername(data.username);
 				navigate("/chat");
 			}
 		} catch (error) {
 			console.log("Error logging in user");
-			console.error(error);
+			if (error.response.data.message === "UserNotFound") {
+				toast.error("User not found");
+				navigate("/register");
+			} else if (error.response.data.message === "InvalidCredentials") {
+				toast.error("Invalid credentials");
+			}
 		}
 	};
 	return (
@@ -40,11 +50,11 @@ const Login = () => {
 								Email address
 							</label>
 							<input
-								id="email-address"
-								type="email"
-								{...register("email", {
+								id="username"
+								type="text"
+								{...register("username", {
 									required: true,
-									autoComplete: "email",
+									autoComplete: "username",
 								})}
 								className="relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-t-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
 								placeholder="Email address"
@@ -103,6 +113,7 @@ const Login = () => {
 					</div>
 				</form>
 			</div>
+			<ToastContainer />
 		</div>
 	);
 };

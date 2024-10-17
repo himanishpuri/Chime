@@ -7,6 +7,8 @@ import Login from "./Pages/Login.jsx";
 import Register from "./Pages/Register.jsx";
 import ChatPage from "./Pages/ChatPage.jsx";
 
+import { UserProvider } from "./Utils/Context.jsx";
+
 const router = createBrowserRouter([
 	{
 		path: "/login",
@@ -24,6 +26,8 @@ const router = createBrowserRouter([
 
 createRoot(document.getElementById("root")).render(
 	<StrictMode>
-		<RouterProvider router={router} />
+		<UserProvider>
+			<RouterProvider router={router} />
+		</UserProvider>
 	</StrictMode>,
 );

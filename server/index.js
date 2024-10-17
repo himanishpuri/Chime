@@ -25,12 +25,40 @@ const io = new Server(server, {
 });
 
 app.use(cors());
-
-let activeRooms = [];
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
 app.get("/api/getRooms", async (req, res) => {
 	const rooms = await Room.find({}, "roomID").lean();
 	return res.status(200).json(rooms);
+});
+
+app.post("/api/login", async (req, res) => {
+	const { username, password } = req.body;
+	const user = await User.findOne({ username });
+	if (!user) {
+		return res.status(404).json({ message: "UserNotFound" });
+	} else if (user.password === password) {
+		return res.sendStatus(200);
+	} else {
+		return res.status(401).json({ message: "InvalidCredentials" });
+	}
+});
+
+app.post("/api/register", async (req, res) => {
+	const { username, name, email, password } = req.body;
+	try {
+		const user = await User.findOne({ $or: [{ username }, { email }] });
+		console.log("user", user);
+		if (user) {
+			return res.status(409).json({ message: "UserAlreadyExists" });
+		} else if (await User.create({ username, name, email, password })) {
+			return res.sendStatus(201);
+		}
+	} catch (error) {
+		console.log("Register error:", error);
+		return res.status(500).json({ message: "ErrorCreatingUser" });
+	}
 });
 
 server.listen(process.env.PORT, () => {

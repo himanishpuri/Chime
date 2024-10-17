@@ -2,17 +2,26 @@ import Message from "./Components/Message.jsx";
 import { useEffect, useState } from "react";
 import { Button } from "@headlessui/react";
 import { io } from "socket.io-client";
+import axios from "axios";
+import { useUser } from "../Utils/Context.jsx";
+import { useNavigate } from "react-router-dom";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
-import axios from "axios";
 
 const BACKEND_URI = import.meta.env.VITE_BACKEND_URI;
-const currentUser =
-	JSON.parse(localStorage.getItem("user"))?.username || "primeGusty";
 
 const socket = io(`${BACKEND_URI}`);
 
 const ChatPage = () => {
+	const { username: currentUser } = useUser();
+	const navigate = useNavigate();
+	if (!currentUser) navigate("/login");
+	const [messages, setMessages] = useState([]);
+	const [textMessage, setTextMessage] = useState("");
+	const [rooms, setRooms] = useState([]);
+	const [newRoomName, setNewRoomName] = useState("");
+	const [currentRoom, setCurrentRoom] = useState("");
+
 	useEffect(() => {
 		axios.get(`${BACKEND_URI}/api/getRooms`).then((res) => {
 			console.log("Rooms", res.data);
@@ -120,13 +129,6 @@ const ChatPage = () => {
 		setMessages((prev) => [...prev, obj]);
 		setTextMessage("");
 	};
-
-	const [messages, setMessages] = useState([]);
-	const [textMessage, setTextMessage] = useState("");
-
-	const [rooms, setRooms] = useState([]);
-	const [newRoomName, setNewRoomName] = useState("");
-	const [currentRoom, setCurrentRoom] = useState("");
 
 	const handleCreateRoom = () => {
 		if (!newRoomName.trim()) {
