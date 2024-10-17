@@ -7,7 +7,7 @@ import express from "express";
 import http from "http";
 import { Server } from "socket.io";
 
-import chatLog from "./chatLog.model.js";
+import ChatLog from "./chatLog.model.js";
 import User from "./user.model.js";
 import Room from "./room.model.js";
 
@@ -42,13 +42,14 @@ io.on("connection", (socket) => {
 
 	socket.on("getChatLog", async (roomID) => {
 		const room = await Room.findOne({ roomID });
-		const chatLogData = await chatLog
-			.find({ roomID: room._id }, "senderID messageContent")
-			.lean();
+		const chatLogData = await ChatLog.find(
+			{ roomID: room._id },
+			"senderID messageContent",
+		).lean();
 		const newArray = await Promise.all(
 			chatLogData.map(async (chat) => {
-				const user = await User.findById(chat.senderID);
-				return { sender: user.username, message: chat.messageContent };
+				const user = await User.findById(chat?.senderID);
+				return { sender: user?.username, message: chat?.messageContent };
 			}),
 		);
 		socket.emit("chatLog", newArray);
@@ -59,48 +60,65 @@ io.on("connection", (socket) => {
 		socket.broadcast.in(roomID).emit("IncomingMessage", message, sender);
 		const room = await Room.findOne({ roomID });
 		const user = await User.findOne({ username: sender });
-		await chatLog.create({
+		if (!room) {
+			socket.emit("Error", "RoomNotFoundToSendMessage");
+			return;
+		}
+		if (!user) {
+			socket.emit("Error", "UserNotFound");
+		}
+		const chatLog = await ChatLog.create({
 			roomID: room._id,
 			senderID: user._id,
 			messageContent: message,
 		});
+		room.chatLogs.push(chatLog._id);
+		await room.save();
 	});
 	socket.on("createRoom", async (roomID, senderID) => {
-		if (await Room.findOne({ roomID })) {
-			socket.emit("RoomInvalid", "RoomAlreadyExists");
+		if (!roomID) {
+			socket.emit("Error", "RoomIDCannotBeNull");
 			return;
 		}
+		if (await Room.findOne({ roomID })) {
+			socket.emit("Error", "RoomAlreadyExists");
+			return;
+		}
+
 		const user = await User.findOne({ username: senderID });
 
 		if (!user) {
-			socket.emit("RoomInvalid", "UserNotFound");
+			socket.emit("Error", "UserNotFound");
 			return;
 		}
-		const room = await Room.create({ roomID, createdBy: user._id });
+
+		await Room.create({ roomID, createdBy: user._id });
 		socket.join(roomID);
 		io.in(roomID).emit("RoomCreated", senderID, roomID);
-		activeRooms.push(roomID);
 	});
 	socket.on("joinRoom", async (roomID, senderID) => {
 		if (!(await Room.findOne({ roomID }))) {
-			socket.emit("RoomInvalid", "RoomNotFoundToJoin");
+			socket.emit("Error", "RoomNotFoundToJoin");
 			return;
 		}
 		if (!(await User.findOne({ username: senderID }))) {
-			socket.emit("RoomInvalid", "UserNotFound");
+			socket.emit("Error", "UserNotFound");
 			return;
 		}
 		socket.join(roomID);
 		io.in(roomID).emit("RoomJoined", senderID, roomID);
 	});
-	socket.on("leaveRoom", (roomID) => {
-		if (!activeRooms.includes(roomID)) {
-			socket.emit("RoomInvalid");
+	socket.on("leaveRoom", async (roomID, senderID) => {
+		if (!(await Room.findOne({ roomID }))) {
+			socket.emit("Error", "RoomNotFoundToLeave");
+			return;
+		}
+		if (!(await User.findOne({ username: senderID }))) {
+			socket.emit("Error", "UserNotFound");
 			return;
 		}
 		socket.leave(roomID);
-		if (!io.sockets.adapter.rooms.has(roomID)) activeRooms.pop(); // to check if room is empty
-		io.in(roomID).emit("RoomLeft", socket.id, roomID);
+		io.in(roomID).emit("RoomLeft", senderID, roomID);
 	});
 	socket.on("disconnect", () => {
 		console.log("User disconnected:", socket.id);

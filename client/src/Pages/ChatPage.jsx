@@ -56,26 +56,39 @@ const ChatPage = () => {
 			socket.emit("getChatLog", roomID);
 			setMessages((prev) => [...prev, obj]);
 		});
-		socket.on("RoomInvalid", (reason) => {
-			console.log("Room invalid");
-			if (reason === "RoomAlreadyExists") {
-				toast.error("Room already exists");
-			} else if (reason === "RoomNotFoundToJoin") {
-				toast.error("Room not found to join");
-			} else if (reason === "UserNotFound") {
-				toast.error("User not found");
+
+		socket.on("Error", (reason) => {
+			switch (reason) {
+				case "RoomAlreadyExists":
+					toast.error("Room already exists");
+					break;
+				case "RoomNotFoundToJoin":
+					toast.error("Room not found to join");
+					break;
+				case "UserNotFound":
+					toast.error("User not found");
+					break;
+				case "RoomNotFoundToSendMessage":
+					toast.error("Room not found to send message");
+					break;
+				case "RoomIDCannotBeNull":
+					toast.error("Room ID cannot be null");
+					break;
+				case "RoomNotFoundToLeave":
+					toast.error("Room not found to leave");
+					break;
+				default:
+					console.log("Room invalid:", reason);
 			}
 		});
 		socket.on("chatLog", (chatLogData) => {
-			console.log("Chat log received", chatLogData);
-			chatLogData.forEach((chat) => {
-				const obj = {
-					message: chat.message,
-					sender: chat.sender,
-					type: chat.sender === currentUser ? "sender" : "receiver",
-				};
-				setMessages((prev) => [...prev, obj]);
-			});
+			chatLogData = chatLogData.map((chat) => ({
+				message: chat.message,
+				sender: chat.sender,
+				type: chat.sender === currentUser ? "sender" : "receiver",
+			}));
+			console.log("Chat log:", chatLogData);
+			setMessages(chatLogData);
 		});
 		return () => {
 			socket.off("connect");
@@ -85,7 +98,6 @@ const ChatPage = () => {
 			socket.off("RoomJoined");
 			socket.off("RoomInvalid");
 			socket.off("chatLog");
-			// socket.close();
 		};
 	}, []);
 
@@ -126,14 +138,22 @@ const ChatPage = () => {
 		socket.emit("createRoom", newRoomName, currentUser);
 	};
 
-	const handleJoinRoom = (roomId) => {
-		if (roomId === currentRoom) {
+	const handleJoinRoom = (roomID) => {
+		if (roomID === currentRoom) {
 			toast.error("You are already in this room");
 			return;
 		}
-		console.log(`Joined room with ID: ${roomId}`);
-		setCurrentRoom(roomId);
-		socket.emit("joinRoom", roomId, currentUser);
+		if (currentRoom) handleLeaveRoom(currentRoom);
+		console.log(`Joined room with ID: ${roomID}`);
+		setCurrentRoom(roomID);
+		socket.emit("joinRoom", roomID, currentUser);
+	};
+
+	const handleLeaveRoom = (roomID) => {
+		setMessages([]);
+		toast.info(`Left room ${roomID}`);
+		console.log(`Left room with ID: ${roomID}`);
+		socket.emit("leaveRoom", roomID, currentUser);
 	};
 
 	return (
@@ -150,17 +170,23 @@ const ChatPage = () => {
 			<main className="flex flex-1 justify-end pt-16 pb-16">
 				<aside className="w-1/4 h-screen absolute left-0 bg-white p-4 overflow-y-scroll border-r border-gray-200">
 					<h2 className="text-xl font-semibold mb-4">Rooms</h2>
-					<ul>
+					<ul className="text-white">
 						{rooms.map((roomName, index) => (
 							<li
 								key={index * 23}
-								className="mt-2 mb-2 cursor-pointer"
+								className="flex mt-2 mb-2 cursor-pointer bg-gray-700"
 							>
 								<Button
 									onClick={() => handleJoinRoom(roomName)}
-									className="bg-gray-700 text-white px-4 py-2 rounded text-left w-full h-full hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-black-400 focus:ring-opacity-75 active:bg-red-500 duration-300 transform hover:scale-105 active:scale-95"
+									className="px-4 py-2 rounded-tl rounded-bl text-left w-full h-full hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-black-400 focus:ring-opacity-75 active:bg-red-500 duration-300 transform hover:scale-105 active:scale-95"
 								>
 									{roomName}
+								</Button>
+								<Button
+									onClick={() => handleLeaveRoom(roomName)}
+									className="px-4 py-2 rounded-tr rounded-br text-left w-max h-full hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-black-400 focus:ring-opacity-75 active:bg-red-500 duration-300 transform hover:scale-105 active:scale-95"
+								>
+									&#10060;
 								</Button>
 							</li>
 						))}
@@ -217,3 +243,88 @@ const ChatPage = () => {
 };
 
 export default ChatPage;
+
+/*useEffect(() => {
+		const fetchRooms = async () => {
+			try {
+				const res = await axios.get(`${BACKEND_URI}/api/getRooms`);
+				console.log("Rooms", res.data);
+				setRooms(res.data.map((room) => room.roomID));
+			} catch (error) {
+				console.error("Error fetching rooms", error);
+			}
+		};
+
+		const handleConnect = () => {
+			console.log("Connected to server");
+		};
+
+		const handleDisconnect = () => {
+			console.log("Disconnected from server");
+		};
+
+		const handleIncomingMessage = (message, sender) => {
+			console.log("Message received", message, sender);
+			const obj = {
+				message,
+				sender,
+				type: "receiver",
+			};
+			setMessages((prev) => [...prev, obj]);
+		};
+
+		const handleRoomCreated = (senderID, roomID) => {
+			console.log("Room created", roomID);
+			toast.success(`Room ${roomID} created by ${senderID}`);
+			const obj = {
+				message: `${roomID} created by ${senderID}`,
+				sender: senderID,
+				type: "event",
+			};
+			setRooms((prev) => [...prev, roomID]);
+			setCurrentRoom(roomID);
+			setMessages((prev) => [...prev, obj]);
+		};
+
+		const handleRoomJoined = (senderID, roomID) => {
+			console.log("Room joined", roomID);
+			const obj = {
+				message: `${senderID} joined ${roomID}`,
+				sender: senderID,
+				type: "event",
+			};
+			socket.emit("getChatLog", roomID);
+			setMessages((prev) => [...prev, obj]);
+		};
+
+		const handleRoomInvalid = (reason) => {
+			console.log("Room invalid");
+			if (reason === "RoomAlreadyExists") {
+				toast.error("Room already exists");
+			} else if (reason === "RoomNotFoundToJoin") {
+				toast.error("Room not found to join");
+			} else if (reason === "UserNotFound") {
+				toast.error("User not found");
+			}
+		};
+
+		fetchRooms();
+
+		socket.on("connect", handleConnect);
+		socket.on("disconnect", handleDisconnect);
+		socket.on("IncomingMessage", handleIncomingMessage);
+		socket.on("RoomCreated", handleRoomCreated);
+		socket.on("RoomJoined", handleRoomJoined);
+		socket.on("RoomInvalid", handleRoomInvalid);
+		socket.on("chatLog", handleChatLog);
+
+		return () => {
+			socket.off("connect", handleConnect);
+			socket.off("disconnect", handleDisconnect);
+			socket.off("IncomingMessage", handleIncomingMessage);
+			socket.off("RoomCreated", handleRoomCreated);
+			socket.off("RoomJoined", handleRoomJoined);
+			socket.off("RoomInvalid", handleRoomInvalid);
+			socket.off("chatLog", handleChatLog);
+		};
+	}, []); */

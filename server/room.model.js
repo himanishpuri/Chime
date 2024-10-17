@@ -4,8 +4,8 @@ const roomSchema = new Schema(
 	{
 		roomID: {
 			type: String,
-			required: true,
-			unique: true,
+			// required: true,
+			// unique: true,
 		},
 		chatLogs: [
 			{
