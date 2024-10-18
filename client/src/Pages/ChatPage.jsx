@@ -25,7 +25,7 @@ const ChatPage = () => {
 	const [currentRoom, setCurrentRoom] = useState("");
 
 	useEffect(() => {
-		axios.get(`${BACKEND_URI}/api/getRooms`).then((res) => {
+		axios.get(`${BACKEND_URI}/api/rooms/getRooms`).then((res) => {
 			console.log("Rooms", res.data);
 			setRooms(res.data.map((room) => room.roomID));
 		});
@@ -37,6 +37,7 @@ const ChatPage = () => {
 
 		socket.on("connect", () => {
 			console.log("Connected to server");
+			toast.success("Connected to server");
 		});
 		socket.on("disconnect", () => {
 			console.log("Disconnected from server");
@@ -60,7 +61,7 @@ const ChatPage = () => {
 			};
 			setRooms((prev) => [...prev, roomID]);
 			setCurrentRoom(roomID);
-			setMessages((prev) => [...prev, obj]);
+			setMessages([obj]);
 		});
 		socket.on("RoomJoined", (senderID, roomID) => {
 			console.log("Room joined", roomID);
@@ -70,6 +71,17 @@ const ChatPage = () => {
 				type: "event",
 			};
 			socket.emit("getChatLog", roomID);
+			setMessages((prev) => [...prev, obj]);
+		});
+
+		socket.on("RoomLeft", (senderID, roomID) => {
+			console.log("Room left", roomID);
+			if (senderID === currentUser) return;
+			const obj = {
+				message: `${senderID} left ${roomID}`,
+				sender: senderID,
+				type: "event",
+			};
 			setMessages((prev) => [...prev, obj]);
 		});
 
@@ -112,7 +124,8 @@ const ChatPage = () => {
 			socket.off("IncomingMessage");
 			socket.off("RoomCreated");
 			socket.off("RoomJoined");
-			socket.off("RoomInvalid");
+			socket.off("RoomLeft");
+			socket.off("Error");
 			socket.off("chatLog");
 		};
 	}, [currentUser, socket]);
@@ -154,11 +167,13 @@ const ChatPage = () => {
 		if (currentRoom) handleLeaveRoom(currentRoom);
 		console.log(`Joined room with ID: ${roomID}`);
 		setCurrentRoom(roomID);
+		toast.info(`Joined room ${roomID}`);
 		socket.emit("joinRoom", roomID, currentUser);
 	};
 
 	const handleLeaveRoom = (roomID) => {
 		setMessages([]);
+		setCurrentRoom("");
 		toast.info(`Left room ${roomID}`);
 		console.log(`Left room with ID: ${roomID}`);
 		socket.emit("leaveRoom", roomID, currentUser);
@@ -172,17 +187,20 @@ const ChatPage = () => {
 
 	return (
 		<div className="flex flex-col h-screen bg-gray-300 overflow-y-visible">
-			<header className="bg-blue-600 text-white p-4 flex justify-between items-center fixed top-0 left-0 right-0 z-10 shadow-lg">
-				<h1 className="text-2xl font-bold">Chat Application</h1>
-				<Button
-					onClick={handleLogout}
-					className="bg-blue-800 text-white px-4 py-2 rounded ml-2 hover:bg-black focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-opacity-75 duration-300 transform hover:scale-105 active:scale-95"
-				>
-					Log Out
-				</Button>
+			<header className="bg-gray-800 text-white p-4 flex justify-between items-center fixed top-0 left-0 right-0 z-10 shadow-lg">
+				<h1 className="text-2xl font-bold">Websocket Chat App</h1>
+				<div className="flex justify-center items-center gap-x-5">
+					<p>{`Signed in as ${currentUser}`}</p>
+					<Button
+						onClick={handleLogout}
+						className="bg-slate-700 text-white px-4 py-2 rounded ml-2 hover:bg-black focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-opacity-75 duration-300 transform hover:scale-105 active:scale-95"
+					>
+						Log Out
+					</Button>
+				</div>
 			</header>
 			<main className="flex flex-1 justify-end pt-16 pb-16">
-				<aside className="w-1/4 h-screen absolute left-0 bg-white p-4 overflow-y-scroll border-r border-gray-200">
+				<aside className="w-1/4 h-screen fixed left-0 bg-white p-4 overflow-y-scroll border-r border-gray-200">
 					<h2 className="text-xl font-semibold mb-4">Rooms</h2>
 					<ul className="text-white">
 						{rooms.map((roomName, index) => (

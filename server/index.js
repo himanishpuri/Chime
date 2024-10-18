@@ -7,14 +7,14 @@ import express from "express";
 import http from "http";
 import { Server } from "socket.io";
 
-import ChatLog from "./chatLog.model.js";
-import User from "./user.model.js";
-import Room from "./room.model.js";
+import ConnectDB from "./src/Configurations/db.config.js";
 
-import mongoose from "mongoose";
+import RoomRoutes from "./src/Routes/roomRoutes.js";
+import AuthRoutes from "./src/Routes/authRoutes.js";
 
-const dbRes = await mongoose.connect(process.env.MONGO_URI);
-if (dbRes) console.log("Connected to MongoDB");
+import chatSocket from "./src/Sockets/chat.socket.js";
+
+ConnectDB();
 
 const app = express();
 const server = http.createServer(app);
@@ -28,127 +28,13 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-app.get("/api/getRooms", async (req, res) => {
-	const rooms = await Room.find({}, "roomID").lean();
-	return res.status(200).json(rooms);
-});
+app.use("/api/rooms", RoomRoutes);
+app.use("/api/auth", AuthRoutes);
 
-app.post("/api/login", async (req, res) => {
-	const { username, password } = req.body;
-	const user = await User.findOne({ username });
-	if (!user) {
-		return res.status(404).json({ message: "UserNotFound" });
-	} else if (user.password === password) {
-		return res.sendStatus(200);
-	} else {
-		return res.status(401).json({ message: "InvalidCredentials" });
-	}
-});
+chatSocket(io);
 
-app.post("/api/register", async (req, res) => {
-	const { username, name, email, password } = req.body;
-	try {
-		const user = await User.findOne({ $or: [{ username }, { email }] });
-		console.log("user", user);
-		if (user) {
-			return res.status(409).json({ message: "UserAlreadyExists" });
-		} else if (await User.create({ username, name, email, password })) {
-			return res.sendStatus(201);
-		}
-	} catch (error) {
-		console.log("Register error:", error);
-		return res.status(500).json({ message: "ErrorCreatingUser" });
-	}
-});
+const PORT = process.env.PORT || 3000;
 
-server.listen(process.env.PORT, () => {
-	console.log(`Server running on port ${process.env.PORT}`);
-});
-
-io.on("connection", (socket) => {
-	console.log("User connected:", socket.id);
-
-	socket.on("getChatLog", async (roomID) => {
-		const room = await Room.findOne({ roomID });
-		const chatLogData = await ChatLog.find(
-			{ roomID: room._id },
-			"senderID messageContent",
-		).lean();
-		const newArray = await Promise.all(
-			chatLogData.map(async (chat) => {
-				const user = await User.findById(chat?.senderID);
-				return { sender: user?.username, message: chat?.messageContent };
-			}),
-		);
-		socket.emit("chatLog", newArray);
-	});
-
-	socket.on("message", async (message, roomID, sender) => {
-		console.log("Message:", message);
-		socket.broadcast.in(roomID).emit("IncomingMessage", message, sender);
-		const room = await Room.findOne({ roomID });
-		const user = await User.findOne({ username: sender });
-		if (!room) {
-			socket.emit("Error", "RoomNotFoundToSendMessage");
-			return;
-		}
-		if (!user) {
-			socket.emit("Error", "UserNotFound");
-		}
-		const chatLog = await ChatLog.create({
-			roomID: room._id,
-			senderID: user._id,
-			messageContent: message,
-		});
-		room.chatLogs.push(chatLog._id);
-		await room.save();
-	});
-	socket.on("createRoom", async (roomID, senderID) => {
-		if (!roomID) {
-			socket.emit("Error", "RoomIDCannotBeNull");
-			return;
-		}
-		if (await Room.findOne({ roomID })) {
-			socket.emit("Error", "RoomAlreadyExists");
-			return;
-		}
-
-		const user = await User.findOne({ username: senderID });
-
-		if (!user) {
-			socket.emit("Error", "UserNotFound");
-			return;
-		}
-
-		await Room.create({ roomID, createdBy: user._id });
-		socket.join(roomID);
-		io.in(roomID).emit("RoomCreated", senderID, roomID);
-	});
-	socket.on("joinRoom", async (roomID, senderID) => {
-		if (!(await Room.findOne({ roomID }))) {
-			socket.emit("Error", "RoomNotFoundToJoin");
-			return;
-		}
-		if (!(await User.findOne({ username: senderID }))) {
-			socket.emit("Error", "UserNotFound");
-			return;
-		}
-		socket.join(roomID);
-		io.in(roomID).emit("RoomJoined", senderID, roomID);
-	});
-	socket.on("leaveRoom", async (roomID, senderID) => {
-		if (!(await Room.findOne({ roomID }))) {
-			socket.emit("Error", "RoomNotFoundToLeave");
-			return;
-		}
-		if (!(await User.findOne({ username: senderID }))) {
-			socket.emit("Error", "UserNotFound");
-			return;
-		}
-		socket.leave(roomID);
-		io.in(roomID).emit("RoomLeft", senderID, roomID);
-	});
-	socket.on("disconnect", () => {
-		console.log("User disconnected:", socket.id);
-	});
+server.listen(PORT, () => {
+	console.log(`Server running on port ${PORT}`);
 });
