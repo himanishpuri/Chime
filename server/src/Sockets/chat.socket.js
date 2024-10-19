@@ -68,7 +68,9 @@ const handleCreateRoom = async (socket, roomID, senderID) => {
 			socket.emit("Error", "UserNotFound");
 			return;
 		}
-		await Room.create({ roomID, createdBy: user._id });
+		const room = await Room.create({ roomID, createdBy: user._id });
+		user.rooms.push(room._id);
+		await user.save();
 		socket.join(roomID);
 		socket.emit("RoomCreated", senderID, roomID);
 	} catch (error) {
@@ -79,13 +81,19 @@ const handleCreateRoom = async (socket, roomID, senderID) => {
 
 const handleJoinRoom = async (socket, roomID, senderID) => {
 	try {
-		if (!(await Room.findOne({ roomID }))) {
+		const room = await Room.findOne({ roomID });
+		const user = await User.findOne({ username: senderID });
+		if (!room) {
 			socket.emit("Error", "RoomNotFoundToJoin");
 			return;
 		}
-		if (!(await User.findOne({ username: senderID }))) {
+		if (!user) {
 			socket.emit("Error", "UserNotFound");
 			return;
+		}
+		if (!user.rooms.includes(room._id)) {
+			user.rooms.push(room._id);
+			await user.save();
 		}
 		socket.join(roomID);
 		socket.emit("RoomJoined", senderID, roomID);
@@ -97,11 +105,13 @@ const handleJoinRoom = async (socket, roomID, senderID) => {
 
 const handleLeaveRoom = async (socket, roomID, senderID) => {
 	try {
-		if (!(await Room.findOne({ roomID }))) {
+		const room = await Room.findOne({ roomID });
+		const user = await User.findOne({ username: senderID });
+		if (!room) {
 			socket.emit("Error", "RoomNotFoundToLeave");
 			return;
 		}
-		if (!(await User.findOne({ username: senderID }))) {
+		if (!user) {
 			socket.emit("Error", "UserNotFound");
 			return;
 		}
@@ -110,6 +120,30 @@ const handleLeaveRoom = async (socket, roomID, senderID) => {
 	} catch (error) {
 		console.error("Error leaving room:", error);
 		socket.emit("Error", "ErrorLeavingRoom");
+	}
+};
+
+const handleRemoveRoom = async (socket, roomID, senderID) => {
+	try {
+		const room = await Room.findOne({ roomID });
+		const user = await User.findOne({ username: senderID });
+		if (!room) {
+			socket.emit("Error", "RoomNotFoundToRemove");
+			return;
+		}
+		if (!user) {
+			socket.emit("Error", "UserNotFound");
+			return;
+		}
+		user.rooms = user.rooms.filter(
+			(userRoom) => userRoom._id.toString() !== room._id.toString(),
+		);
+		await user.save();
+		socket.leave(roomID);
+		socket.emit("RoomRemoved", senderID, roomID);
+	} catch (error) {
+		console.error("Error removing room:", error);
+		socket.emit("Error", "ErrorRemovingRoom");
 	}
 };
 
@@ -133,6 +167,9 @@ const chatSocket = (io) => {
 		);
 		socket.on("leaveRoom", (roomID, senderID) =>
 			handleLeaveRoom(socket, roomID, senderID),
+		);
+		socket.on("removeRoom", (roomID, senderID) =>
+			handleRemoveRoom(socket, roomID, senderID),
 		);
 		socket.on("disconnect", () => handleDisconnect(socket));
 	});

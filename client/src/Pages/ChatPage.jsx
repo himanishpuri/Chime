@@ -4,6 +4,7 @@ import { Button } from "@headlessui/react";
 import axios from "axios";
 import { useUser } from "../Utils/Context.jsx";
 import { useNavigate } from "react-router-dom";
+import exitIcon from "./Assets/exitIcon.svg";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 
@@ -25,10 +26,15 @@ const ChatPage = () => {
 	const [currentRoom, setCurrentRoom] = useState("");
 
 	useEffect(() => {
-		axios.get(`${BACKEND_URI}/api/rooms/getRooms`).then((res) => {
-			console.log("Rooms", res.data);
-			setRooms(res.data.map((room) => room.roomID));
-		});
+		axios
+			.post(`${BACKEND_URI}/api/rooms/getRooms`, { currentUser })
+			.then((res) => {
+				console.log("Rooms", res.data);
+				setRooms(res.data.map((rooms) => rooms.roomID));
+			})
+			.catch(() => {
+				console.error("Error fetching rooms");
+			});
 
 		if (!socket) {
 			navigate("/login");
@@ -85,6 +91,10 @@ const ChatPage = () => {
 			setMessages((prev) => [...prev, obj]);
 		});
 
+		socket.on("RoomRemoved", (senderID, roomID) => {
+			toast.info(`Room ${roomID} removed by ${senderID}`);
+		});
+
 		socket.on("Error", (reason) => {
 			switch (reason) {
 				case "RoomAlreadyExists":
@@ -104,6 +114,30 @@ const ChatPage = () => {
 					break;
 				case "RoomNotFoundToLeave":
 					toast.error("Room not found to leave");
+					break;
+				case "RoomNotFoundToRemove":
+					toast.error("Room not found to remove");
+					break;
+				case "UserAlreadyInRoom":
+					toast.error("User already in room");
+					break;
+				case "ErrorJoiningRoom":
+					toast.error("Error joining room");
+					break;
+				case "ErrorLeavingRoom":
+					toast.error("Error leaving room");
+					break;
+				case "ErrorRemovingRoom":
+					toast.error("Error removing room");
+					break;
+				case "ErrorCreatingRoom":
+					toast.error("Error creating room");
+					break;
+				case "ErrorFetchingChatLog":
+					toast.error("Error fetching chat log");
+					break;
+				case "ErrorHandlingMessage":
+					toast.error("Error handling message");
 					break;
 				default:
 					console.log("Room invalid:", reason);
@@ -171,12 +205,35 @@ const ChatPage = () => {
 		socket.emit("joinRoom", roomID, currentUser);
 	};
 
+	const handleJoinRoomfromInput = () => {
+		if (newRoomName.trim()) {
+			if (currentRoom) handleLeaveRoom(currentRoom);
+			console.log(`Joined room with ID: ${newRoomName}`);
+			setCurrentRoom(newRoomName);
+			toast.info(`Joined room ${newRoomName}`);
+			socket.emit("joinRoom", newRoomName, currentUser);
+			setRooms((prev) => [...prev, newRoomName]);
+		} else {
+			toast.error("Room name cannot be empty");
+		}
+		setNewRoomName("");
+	};
+
 	const handleLeaveRoom = (roomID) => {
 		setMessages([]);
 		setCurrentRoom("");
 		toast.info(`Left room ${roomID}`);
 		console.log(`Left room with ID: ${roomID}`);
 		socket.emit("leaveRoom", roomID, currentUser);
+	};
+
+	const handleRemoveRoom = (roomID) => {
+		if (currentRoom === roomID) {
+			setCurrentRoom("");
+			setMessages([]);
+		}
+		socket.emit("removeRoom", roomID, currentUser);
+		setRooms((prev) => prev.filter((room) => room !== roomID));
 	};
 
 	const handleLogout = () => {
@@ -218,6 +275,16 @@ const ChatPage = () => {
 									onClick={() => handleLeaveRoom(roomName)}
 									className="px-4 py-2 rounded-tr rounded-br text-left w-max h-full hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-black-400 focus:ring-opacity-75 active:bg-red-500 duration-300 transform hover:scale-105 active:scale-95"
 								>
+									<img
+										src={exitIcon}
+										alt="exitIcon"
+										className="w-10 aspect-square"
+									/>
+								</Button>
+								<Button
+									onClick={() => handleRemoveRoom(roomName)}
+									className="px-4 py-2 rounded-tr rounded-br text-left w-max h-full hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-black-400 focus:ring-opacity-75 active:bg-red-500 duration-300 transform hover:scale-105 active:scale-95"
+								>
 									&#10060;
 								</Button>
 							</li>
@@ -231,13 +298,22 @@ const ChatPage = () => {
 							value={newRoomName}
 							onChange={(e) => setNewRoomName(e.target.value)}
 						/>
-						<Button
-							onClick={handleCreateRoom}
-							className="bg-violet-500 text-white px-4 py-2 rounded mt-2 hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-green-400 focus:ring-opacity-75 disabled:opacity-50 disabled:bg-gray-400 disabled:cursor-not-allowed duration-300 transform hover:scale-105 active:scale-95"
-							disabled={!newRoomName.trim()}
-						>
-							Create Room
-						</Button>
+						<div className="flex justify-between">
+							<Button
+								onClick={handleCreateRoom}
+								className="bg-violet-500 text-white px-4 py-2 rounded mt-2 hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-green-400 focus:ring-opacity-75 disabled:opacity-50 disabled:bg-gray-400 disabled:cursor-not-allowed duration-300 transform hover:scale-105 active:scale-95"
+								disabled={!newRoomName.trim()}
+							>
+								Create Room
+							</Button>
+							<Button
+								onClick={handleJoinRoomfromInput}
+								className="bg-violet-500 text-white px-4 py-2 rounded mt-2 hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-green-400 focus:ring-opacity-75 disabled:opacity-50 disabled:bg-gray-400 disabled:cursor-not-allowed duration-300 transform hover:scale-105 active:scale-95"
+								disabled={!newRoomName.trim()}
+							>
+								Join Room
+							</Button>
+						</div>
 					</div>
 				</aside>
 				<section className="flex-initial flex self-end w-3/4 flex-col bg-gray-300">
