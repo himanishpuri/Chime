@@ -29,7 +29,6 @@ const ChatPage = () => {
 		axios
 			.post(`${BACKEND_URI}/api/rooms/getRooms`, { currentUser })
 			.then((res) => {
-				console.log("Rooms", res.data);
 				setRooms(res.data.map((rooms) => rooms.roomID));
 			})
 			.catch(() => {
@@ -42,14 +41,11 @@ const ChatPage = () => {
 		}
 
 		socket.on("connect", () => {
-			console.log("Connected to server");
 			toast.success("Connected to server");
 		});
 		socket.on("disconnect", () => {
-			console.log("Disconnected from server");
 		});
 		socket.on("IncomingMessage", (message, sender) => {
-			console.log("Message received", message, sender);
 			const obj = {
 				message,
 				sender,
@@ -58,7 +54,6 @@ const ChatPage = () => {
 			setMessages((prev) => [...prev, obj]);
 		});
 		socket.on("RoomCreated", (senderID, roomID) => {
-			console.log("Room created", roomID);
 			toast.success(`Room ${roomID} created by ${senderID}`);
 			const obj = {
 				message: `${roomID} created by ${senderID}`,
@@ -70,7 +65,6 @@ const ChatPage = () => {
 			setMessages([obj]);
 		});
 		socket.on("RoomJoined", (senderID, roomID) => {
-			console.log("Room joined", roomID);
 			const obj = {
 				message: `${senderID} joined ${roomID}`,
 				sender: senderID,
@@ -81,7 +75,6 @@ const ChatPage = () => {
 		});
 
 		socket.on("RoomLeft", (senderID, roomID) => {
-			console.log("Room left", roomID);
 			if (senderID === currentUser) return;
 			const obj = {
 				message: `${senderID} left ${roomID}`,
@@ -140,7 +133,7 @@ const ChatPage = () => {
 					toast.error("Error handling message");
 					break;
 				default:
-					console.log("Room invalid:", reason);
+					console.error("Room invalid:", reason);
 			}
 		});
 		socket.on("chatLog", (chatLogData) => {
@@ -149,7 +142,6 @@ const ChatPage = () => {
 				sender: chat.sender,
 				type: chat.sender === currentUser ? "sender" : "receiver",
 			}));
-			console.log("Chat log:", chatLogData);
 			setMessages(chatLogData);
 		});
 		return () => {
@@ -173,7 +165,6 @@ const ChatPage = () => {
 			toast.error("Please join a room to send messages");
 			return;
 		}
-		console.log("Message sent", textMessage);
 		socket.emit("message", textMessage, currentRoom, currentUser);
 		const obj = {
 			message: textMessage,
@@ -199,7 +190,6 @@ const ChatPage = () => {
 			return;
 		}
 		if (currentRoom) handleLeaveRoom(currentRoom);
-		console.log(`Joined room with ID: ${roomID}`);
 		setCurrentRoom(roomID);
 		toast.info(`Joined room ${roomID}`);
 		socket.emit("joinRoom", roomID, currentUser);
@@ -208,7 +198,6 @@ const ChatPage = () => {
 	const handleJoinRoomfromInput = () => {
 		if (newRoomName.trim()) {
 			if (currentRoom) handleLeaveRoom(currentRoom);
-			console.log(`Joined room with ID: ${newRoomName}`);
 			setCurrentRoom(newRoomName);
 			toast.info(`Joined room ${newRoomName}`);
 			socket.emit("joinRoom", newRoomName, currentUser);
@@ -223,7 +212,6 @@ const ChatPage = () => {
 		setMessages([]);
 		setCurrentRoom("");
 		toast.info(`Left room ${roomID}`);
-		console.log(`Left room with ID: ${roomID}`);
 		socket.emit("leaveRoom", roomID, currentUser);
 	};
 

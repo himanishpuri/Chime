@@ -13,21 +13,17 @@ const Register = () => {
 	const { setUsername, connectSocket } = useUser();
 
 	const onSubmit = async (data) => {
-		console.log(data);
-		console.log(BACKEND_URI);
 		try {
 			const response = await axios.post(
 				`${BACKEND_URI}/api/auth/register`,
 				data,
 			);
 			if (response.statusText === "Created") {
-				console.log("User registered successfully");
 				setUsername(data.username);
 				connectSocket();
 				navigate("/chat");
 			}
 		} catch (error) {
-			console.log("Error registering user");
 			if (error.response.data.message === "UserAlreadyExists") {
 				navigate("/login");
 			} else {

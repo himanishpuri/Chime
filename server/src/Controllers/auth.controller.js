@@ -4,14 +4,12 @@ export const register = async (req, res) => {
 	const { username, name, email, password } = req.body;
 	try {
 		const user = await User.findOne({ $or: [{ username }, { email }] });
-		console.log("user", user);
 		if (user) {
 			return res.status(409).json({ message: "UserAlreadyExists" });
 		} else if (await User.create({ username, name, email, password })) {
 			return res.sendStatus(201);
 		}
 	} catch (error) {
-		console.log("Register error:", error);
 		return res.status(500).json({ message: "ErrorCreatingUser" });
 	}
 };
@@ -28,7 +26,6 @@ export const login = async (req, res) => {
 			return res.status(401).json({ message: "InvalidCredentials" });
 		}
 	} catch (error) {
-		console.log("Login error:", error);
 		return res.status(500).json({ message: "ErrorLoggingIn" });
 	}
 };

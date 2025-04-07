@@ -28,7 +28,6 @@ const handleGetChatLog = async (socket, roomID) => {
 
 const handleMessage = async (socket, message, roomID, sender) => {
 	try {
-		console.log("Message:", message);
 		socket.broadcast.in(roomID).emit("IncomingMessage", message, sender);
 		const room = await Room.findOne({ roomID });
 		const user = await User.findOne({ username: sender });

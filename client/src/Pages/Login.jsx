@@ -12,21 +12,17 @@ const Login = () => {
 	const { setUsername, connectSocket } = useUser();
 
 	const onSubmit = async (data) => {
-		console.log("Login data:", data);
-		console.log(BACKEND_URI);
 		try {
 			const response = await axios.post(
 				`${BACKEND_URI}/api/auth/login`,
 				data,
 			);
 			if (response.statusText === "OK") {
-				console.log("User logged in successfully");
 				setUsername(data.username);
 				connectSocket();
 				navigate("/chat");
 			}
 		} catch (error) {
-			console.log("Error logging in user");
 			if (error.response.data.message === "UserNotFound") {
 				toast.error("User not found");
 				navigate("/");
