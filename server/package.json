@@ -5,11 +5,12 @@
   "main": "index.js",
   "type": "module",
   "scripts": {
-    "dev": "nodemon index.js"
+    "dev": "nodemon index.js",
+    "build": "npm install"
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/himanishpuri/chat-application"
+    "url": "https://github.com/himanishpuri/Chime"
   },
   "keywords": [
     "websocket",
